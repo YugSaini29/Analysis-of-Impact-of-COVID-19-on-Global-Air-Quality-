@@ -5,7 +5,7 @@ from scipy import stats
 
 df_2019_q4 = pd.read_csv('data2019_Q4.csv', skiprows=4)
 df_2020_q3 = pd.read_csv('data2020_Q3.csv', skiprows=4)
-# df_2020_q4 = pd.read_csv('data2020_Q4.csv', skiprows=4)
+
 
 def clean_air_data(df):
     df = df[~df['Date'].astype(str).str.contains('#', na=False)]
@@ -15,12 +15,12 @@ def clean_air_data(df):
 
 df_2019_q4 = clean_air_data(df_2019_q4)
 df_2020_q3 = clean_air_data(df_2020_q3)
-# df_2020_q4 = clean_air_data(df_2020_q4)
+
 
 # Combine 2020 data to represent "after COVID" period
-# df_during_covid = pd.concat([df_2020_q3, df_2020_q4])1
-df_during_covid = df_2020_q3
-# Get unique pollutant species
+
+df_post_covid = df_2020_q3
+# Geting unique pollutant species names
 pollutants = sorted(df_2019_q4['Specie'].unique())
 
 # Store t-test results
@@ -36,25 +36,21 @@ for pollutant in pollutants:
     pre_covid = df_2019_q4[df_2019_q4['Specie'] == pollutant]['median'].dropna()
     
     # Get during-COVID data for this pollutant
-    during_covid = df_during_covid[df_during_covid['Specie'] == pollutant]['median'].dropna()
-    
-    # Skip if there's not enough data
-    if len(pre_covid) < 2 or len(during_covid) < 2:
-        continue
+    post_covid = df_post_covid[df_post_covid['Specie'] == pollutant]['median'].dropna()
     
     # Perform t-test
-    t_stat, p_value = stats.ttest_ind(pre_covid, during_covid, equal_var=False)
+    t_stat, p_value = stats.ttest_ind(pre_covid, post_covid, equal_var=False)
     
-    # Calculate means
+    # Calculate means of medians
     pre_mean = pre_covid.mean()
-    during_mean = during_covid.mean()
-    percent_change = ((during_mean - pre_mean) / pre_mean) * 100
+    post_mean = post_covid.mean()
+    percent_change = ((post_mean - pre_mean) / pre_mean) * 100
     
     # Store results
     results.append({
         'Pollutant': pollutant,
         'Pre-COVID Mean': round(pre_mean, 2),
-        'During-COVID Mean': round(during_mean, 2),
+        'Post-COVID Mean': round(post_mean, 2),
         'Percent Change': round(percent_change, 2),
         'p-value': round(p_value, 4),
         'Significant': p_value < 0.05
@@ -74,7 +70,7 @@ if not significant_results.empty:
     # Prepare data for plotting
     pollutants = significant_results['Pollutant']
     pre_means = significant_results['Pre-COVID Mean']
-    during_means = significant_results['During-COVID Mean']
+    post_means = significant_results['Post-COVID Mean']
     
     # Set up bar positions
     x = np.arange(len(pollutants))
@@ -82,7 +78,7 @@ if not significant_results.empty:
     
     # Create bars
     plt.bar(x - width/2, pre_means, width, label='Pre-COVID (2019 Q4)')
-    plt.bar(x + width/2, during_means, width, label='During COVID (2020 Q3-Q4)')
+    plt.bar(x + width/2, post_means, width, label='After COVID (2020 Q3)')
     
     # Add labels and title
     plt.xlabel('Pollutants')
@@ -96,7 +92,7 @@ if not significant_results.empty:
         percent = significant_results[significant_results['Pollutant'] == pollutant]['Percent Change'].values[0]
         direction = "↓" if percent < 0 else "↑"
         plt.annotate(f"{abs(percent):.1f}% {direction}", 
-                     xy=(i, max(pre_means[i], during_means[i]) + 1),
+                     xy=(i, max(pre_means[i], post_means[i]) + 1),
                      ha='center')
     
     plt.tight_layout()
